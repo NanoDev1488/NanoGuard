@@ -37,7 +37,7 @@ pub fn scan_jar<P: AsRef<Path>>(path: P) -> Result<JarScanReport, String> {
 
     for i in 0..zip.len() {
         if let Ok(mut entry) = zip.by_index(i) {
-            let name = entry.name().to_string();
+            let name = String::from_utf8_lossy(entry.name_raw()).to_string();
             if name == "plugin.yml" {
                 let mut s = String::new();
                 let _ = entry.read_to_string(&mut s);
