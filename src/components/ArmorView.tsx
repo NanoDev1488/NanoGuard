@@ -103,6 +103,7 @@ export const ArmorView: React.FC<ArmorViewProps> = ({ onSelectFile, selectedJar,
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', height: '100%' }}>
       {/* Hero Drop Box */}
       <div
+        id="armor-drop-zone"
         onClick={onSelectFile}
         style={{
           border: '2px dashed #1a3644',
@@ -323,6 +324,7 @@ export const ArmorView: React.FC<ArmorViewProps> = ({ onSelectFile, selectedJar,
         {/* Large Action Button */}
         {selectedJar && (
           <button
+            id="btn-protect"
             onClick={handleProtect}
             disabled={protecting}
             className="small-caps"

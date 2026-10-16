@@ -31,6 +31,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       {/* Navigation tabs */}
       <div style={{ display: 'flex', gap: '8px' }}>
         <button
+          id="tab-audit"
           onClick={() => onTabChange('audit')}
           className="small-caps"
           style={{
@@ -68,6 +69,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         </button>
 
         <button
+          id="tab-protect"
           onClick={() => onTabChange('protect')}
           className="small-caps"
           style={{
@@ -91,6 +93,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         </button>
 
         <button
+          id="tab-console"
           onClick={() => onTabChange('console')}
           className="small-caps"
           style={{

@@ -67,6 +67,7 @@ export const AuditView: React.FC<AuditViewProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', height: '100%' }}>
       {/* Hero Drop Zone */}
       <div
+        id="audit-drop-zone"
         onClick={onSelectFile}
         style={{
           border: '2px dashed #1a3644',
@@ -109,6 +110,7 @@ export const AuditView: React.FC<AuditViewProps> = ({
           style={{ display: 'flex', gap: '10px', marginTop: '6px' }}
         >
           <button
+            id="btn-select-jar"
             onClick={onSelectFile}
             style={{
               padding: '6px 14px',
@@ -127,6 +129,7 @@ export const AuditView: React.FC<AuditViewProps> = ({
           {selectedJar && (
             <>
               <button
+                id="btn-scan"
                 onClick={() => onScan('deep')}
                 disabled={scanning}
                 style={{
