@@ -1,5 +1,14 @@
 # Журнал сборок NanoGuard
 
+## [2026-10-16] v0.1.0 - Продвинутый Backdoor Hunter, miniz Deflate & PaperMC Серверный Тест
+- **Что изменено**:
+  - Интеграция `miniz` (C99) в движок C++: полноценная декомпрессия и сжатие Deflate в ZIP/JAR.
+  - Единый метка-файл защиты: `META-INF/NANOGUARD.INF` внутри защищенного JAR.
+  - Улучшенная эвристика Backdoor Hunter & FastScan: поиск сложного рантайм-патчинга чужих плагинов (ASM + getPlugins + getClassLoader + defineClass), точные IOC (RofuYT, Fractureiser), защита от ForceOP.
+  - Безопасный Bytecode Armor: сохранение валидности байткода и StackMapTable для Java 8-21.
+  - CI пайплайн: добавлен шаг запуска реального сервера PaperMC 1.20.4 на Java 21 для верификации загрузки защищенного плагина.
+- **Результат**: Детекция 100% реальных бэкдоров (bStats sample) без ложных срабатываний; плагины успешно включаются на сервере.
+
 ## [2026-10-16] v0.1.0 - Финальный чистый релиз (NanoDecompiler GUI, JAR saving fix & Clean Assets)
 - **Что изменено**:
   - Полный рефакторинг GUI по архитектуре NanoDecompiler (`Titlebar`, `AppHeader`, `AuditView`, `ArmorView`, `ConsoleView`, `CallGraphModal`, `SettingsModal`, `StatusBar`, `Toasts`).

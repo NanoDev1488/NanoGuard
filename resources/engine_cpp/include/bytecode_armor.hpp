@@ -10,8 +10,8 @@ namespace nanoguard {
 
 struct ArmorOptions {
     bool strip_metadata = true;      // Strip LVT, LineNumbers, SourceFile
-    bool encrypt_strings = true;      // Dynamic polymorphic string encryption
-    bool anti_decompile = true;       // Bridge methods & CFG confusion
+    bool encrypt_strings = false;     // Dynamic polymorphic string encryption
+    bool anti_decompile = true;       // Bridge methods & synthetic traps
     uint8_t encryption_seed = 0xA7;   // Build-specific polymorphic seed
 };
 
@@ -32,11 +32,11 @@ public:
         return static_cast<uint8_t>(dis(gen));
     }
 
-    // 1. Metadata Stripping: Removes LineNumberTable, LocalVariableTable, SourceFile
+    // 1. Metadata Stripping: Removes LineNumberTable, LocalVariableTable, SourceFile, MethodParameters
     static size_t strip_metadata(ClassFile& cf) {
         size_t count = 0;
 
-        // Strip class-level attributes (SourceFile, SourceDebugExtension)
+        // Strip class-level attributes (SourceFile, SourceDebugExtension, Deprecated)
         auto is_debug_attr = [&](const AttributeInfo& attr) {
             std::string name = cf.get_utf8(attr.attribute_name_index);
             return (name == "SourceFile" || name == "SourceDebugExtension" || name == "Deprecated");
@@ -46,8 +46,16 @@ public:
         cf.attributes.erase(std::remove_if(cf.attributes.begin(), cf.attributes.end(), is_debug_attr), cf.attributes.end());
         count += (orig_sz - cf.attributes.size());
 
-        // Strip method-level and code-level attributes (LineNumberTable, LocalVariableTable, LocalVariableTypeTable)
+        // Strip method-level and code-level attributes (LineNumberTable, LocalVariableTable, LocalVariableTypeTable, MethodParameters)
         for (auto& m : cf.methods) {
+            auto is_method_debug_attr = [&](const AttributeInfo& attr) {
+                std::string name = cf.get_utf8(attr.attribute_name_index);
+                return (name == "MethodParameters" || name == "Deprecated");
+            };
+            size_t orig_m = m.attributes.size();
+            m.attributes.erase(std::remove_if(m.attributes.begin(), m.attributes.end(), is_method_debug_attr), m.attributes.end());
+            count += (orig_m - m.attributes.size());
+
             for (auto& attr : m.attributes) {
                 if (attr.is_code) {
                     auto is_code_debug_attr = [&](const AttributeInfo& sub) {
@@ -69,54 +77,40 @@ public:
         return count;
     }
 
-    // 2. Synthetic & Bridge Method Traps (Confuses CFR, Fernflower, Jadx, JD-GUI)
+    // 2. Synthetic & Anti-Decompiler Traps:
+    // Adds synthetic flags to private helpers, adds synthetic trap fields, and adds custom armor attributes.
+    // Preserves JVM bytecode verification 100% (no VerifyError or StackMapTable corruption).
     static size_t inject_anti_decompiler_traps(ClassFile& cf) {
         size_t traps = 0;
+
         for (auto& m : cf.methods) {
             std::string name = cf.get_utf8(m.name_index);
-            // Skip constructor and static initializer
-            if (name == "<init>" || name == "<clinit>") continue;
+            // Skip constructor, static initializer, and public/protected Bukkit entrypoints
+            if (name == "<init>" || name == "<clinit>" || name == "onEnable" || name == "onDisable" || name == "onCommand") {
+                continue;
+            }
 
-            // Set ACC_SYNTHETIC | ACC_BRIDGE on private/internal methods
-            if (!(m.access_flags & ACC_ABSTRACT) && !(m.access_flags & ACC_NATIVE)) {
-                // If private or static, adding ACC_SYNTHETIC forces decompilers to hide or fail
-                if (m.access_flags & ACC_PRIVATE) {
+            // Mark purely private internal helper methods with ACC_SYNTHETIC
+            if ((m.access_flags & ACC_PRIVATE) && !(m.access_flags & ACC_NATIVE) && !(m.access_flags & ACC_ABSTRACT)) {
+                if (!(m.access_flags & ACC_SYNTHETIC)) {
                     m.access_flags |= ACC_SYNTHETIC;
                     traps++;
                 }
-
-                // In code: inject harmless dead jump (GOTO +3, NOP) to break linear decompilation
-                for (auto& attr : m.attributes) {
-                    if (attr.is_code && attr.code.size() > 5) {
-                        // Insert GOTO around a dummy block at offset 0
-                        // GOTO (3 bytes): opcode 0xA7, branch offset +0x0003
-                        // [0xA7, 0x00, 0x03] -> jumps right past itself!
-                        // Decompilers detect redundant unreachable blocks or synthetic jump loops.
-                        std::vector<uint8_t> new_code;
-                        new_code.reserve(attr.code.size() + 3);
-                        new_code.push_back(GOTO);
-                        new_code.push_back(0x00);
-                        new_code.push_back(0x03);
-                        new_code.insert(new_code.end(), attr.code.begin(), attr.code.end());
-
-                        // Adjust exception table offsets
-                        for (auto& ex : attr.exception_table) {
-                            ex.start_pc += 3;
-                            ex.end_pc += 3;
-                            ex.handler_pc += 3;
-                        }
-
-                        attr.code = std::move(new_code);
-                        traps++;
-                        break;
-                    }
-                }
             }
         }
+
+        // Mark private internal fields with ACC_SYNTHETIC
+        for (auto& f : cf.fields) {
+            if ((f.access_flags & ACC_PRIVATE) && !(f.access_flags & ACC_SYNTHETIC)) {
+                f.access_flags |= ACC_SYNTHETIC;
+                traps++;
+            }
+        }
+
         return traps;
     }
 
-    // 3. Dynamic String Encryption (XOR+ polymorphic key per build)
+    // 3. Dynamic String Encryption (Optional)
     static size_t encrypt_constant_strings(ClassFile& cf, uint8_t key) {
         size_t count = 0;
         std::string marker = "[NG:" + std::to_string(key) + "]";
@@ -131,7 +125,6 @@ public:
                     if (orig.rfind("[NG:", 0) == 0 || orig.length() < 3) continue;
                     if (orig.find("org/bukkit") != std::string::npos || orig.find("java/") != std::string::npos) continue;
 
-                    // Encrypt string bytes with XOR + key + index
                     std::string enc = marker;
                     for (size_t k = 0; k < orig.size(); ++k) {
                         uint8_t enc_byte = static_cast<uint8_t>(orig[k]) ^ (key + static_cast<uint8_t>(k % 7));

@@ -15,17 +15,15 @@
 
 ## Реализовано (v0.1.0)
 1. **Модуль Backdoor Hunter**:
-   - Детекция RCE (`ProcessBuilder`, `Runtime.exec`), `URLClassLoader` дропперов.
-   - Детекция перехвата прав: `Player.setOp(true)`, PermissionAttachment `*`.
-   - Эвристика скрытых команд в `AsyncPlayerChatEvent` / `PlayerCommandPreprocessEvent`.
-   - Распознавание обфускаторов: Allatori, Zelix, Stringer, ProGuard.
-   - Интерактивный граф вызовов (`CallGraphModal`) с точными шестнадцатеричными смещениями.
-2. **Модуль Bytecode Armor**:
-   - Гарантированная запись защищенного JAR на диск с пересчетом CRC-32 и локальных/центральных заголовков ZIP.
-   - Динамическое шифрование строк полиморфным ключом билда (`XOR+`).
-   - Anti-decompiler ловушки (`ACC_SYNTHETIC | ACC_BRIDGE`, GOTO dead jumps).
-   - Вырезание отладочного мусора (`LineNumberTable`, `LocalVariableTable`, `SourceFile`).
-   - Кнопка «Открыть в проводнике» через `shell.showItemInFolder`.
+   - Детекция сложного рантайм-патчинга байткода через ASM (`org/objectweb/asm` + `getPlugins` + `getClassLoader` + `defineClass`).
+   - Точные индикаторы компрометации (IOC): `RofuYT` (автор бэкдора bStats), кампания Fractureiser (`plugin-config.bin`, C2 домены).
+   - Детекция RCE (`ProcessBuilder`, `Runtime.exec`), `URLClassLoader` дропперов, ForceOP (`Player.setOp(true)`), эксфильтрации через Discord/Telegram.
+   - Кража учетных данных браузеров (Login Data, Cookies, Discord leveldb) и закрепление в системе (schtasks, Run, Startup).
+2. **Модуль Bytecode Armor & ZIP движок**:
+   - Встроенная библиотека `miniz` (C99): корректное чтение и запись сжатых Deflate-архивов JAR.
+   - Единый метка-файл защиты: `META-INF/NANOGUARD.INF`.
+   - 100% совместимость с JVM (Java 8 - 21): вырезание `LineNumberTable`, `LocalVariableTable`, `SourceFile`, `MethodParameters` без нарушения байткода и StackMapTable.
+   - Верификация в CI: запуск защищенного плагина на реальном сервере PaperMC 1.20.4.
 3. **GUI & Релиз**:
    - Модульный UI в стиле NanoDecompiler, терминал логов в реальном времени, модалка настроек.
    - Четкие Retina 2x скриншоты интерфейса в `docs/screenshots/`.
