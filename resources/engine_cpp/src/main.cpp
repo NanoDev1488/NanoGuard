@@ -225,7 +225,6 @@ int main(int argc, char* argv[]) {
                 entry.data = cf.serialize();
                 entry.uncompressed_size = static_cast<uint32_t>(entry.data.size());
                 entry.compressed_size = static_cast<uint32_t>(entry.data.size());
-                entry.compression_method = 0; // STORED
             }
         }
 
