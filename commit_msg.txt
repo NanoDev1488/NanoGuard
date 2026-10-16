@@ -1,5 +1,0 @@
-feat(engine): link GUI engine preference to Rust fastscan & C++ disassembler
-
-- Support passing engine preference ('cpp' | 'rust') in preload.ts and electron/main.ts
-- Allow switching between Rust FastScan (parallel Rayon) and C++17 Streaming Parser from UI
-- Both nanoguard.exe and nanoguard-fastscan.exe bundled inside portable EXE
