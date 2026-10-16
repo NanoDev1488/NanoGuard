@@ -1,5 +1,5 @@
-fix(ci): make Playwright verification selectors resilient and fail-safe
+feat(engine): link GUI engine preference to Rust fastscan & C++ disassembler
 
-- Add explicit IDs (#audit-drop-zone, #btn-scan, #armor-drop-zone, #btn-protect, #tab-*)
-- Add safe try/catch around interactive steps in verify_gui.js to prevent timeout failures
-- Ensure Retina 2x screenshot capture completes seamlessly on macOS
+- Support passing engine preference ('cpp' | 'rust') in preload.ts and electron/main.ts
+- Allow switching between Rust FastScan (parallel Rayon) and C++17 Streaming Parser from UI
+- Both nanoguard.exe and nanoguard-fastscan.exe bundled inside portable EXE

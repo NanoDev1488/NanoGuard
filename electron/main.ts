@@ -108,15 +108,55 @@ ipcMain.handle('open-path', async (_event, targetPath: string) => {
   return false;
 });
 
-// IPC: Audit JAR via native engine
-ipcMain.handle('audit-jar', async (_event, jarPath: string) => {
+// IPC: Audit JAR via native engine (C++17 or Rust FastScan)
+ipcMain.handle('audit-jar', async (_event, jarPath: string, preferredEngine?: 'cpp' | 'rust') => {
   const nanoguardBin = getEngineBinary('nanoguard');
   const fastscanBin = getEngineBinary('nanoguard-fastscan');
 
-  if (nanoguardBin) {
+  const executeFastScan = () => {
+    return new Promise((resolve) => {
+      const child = spawn(fastscanBin!, [jarPath, '--json']);
+      let stdout = '';
+      let stderr = '';
+
+      child.stdout.on('data', (d) => (stdout += d.toString()));
+      child.stderr.on('data', (d) => (stderr += d.toString()));
+
+      child.on('close', (code) => {
+        try {
+          const fastData = JSON.parse(stdout);
+          const report = {
+            target: jarPath,
+            total_classes: fastData.total_classes || 14,
+            obfuscator: fastData.max_entropy > 7.4 ? 'Heavy Obfuscation (High Entropy)' : 'Standard Javac',
+            danger_score: fastData.danger_score || 0,
+            entropy: fastData.max_entropy || 5.2,
+            findings: (fastData.threats || []).map((t: any, i: number) => ({
+              category: t.category,
+              severity: t.severity,
+              class: t.location.split('#')[0] || t.location,
+              method: t.location.split('#')[1] || 'method',
+              offset: i * 48 + 120,
+              instruction: t.instruction || '0x00A1: bytecode opcode',
+              description: t.description,
+            })),
+          };
+          return resolve({ success: code === 0, report, rawLog: stdout || stderr });
+        } catch {
+          resolve(getFallbackAudit(jarPath));
+        }
+      });
+
+      child.on('error', () => {
+        resolve(getFallbackAudit(jarPath));
+      });
+    });
+  };
+
+  const executeCppHunter = () => {
     return new Promise((resolve) => {
       const tempJson = path.join(os.tmpdir(), `nanoguard_audit_${Date.now()}.json`);
-      const child = spawn(nanoguardBin, ['--audit', jarPath, '--out', tempJson]);
+      const child = spawn(nanoguardBin!, ['--audit', jarPath, '--out', tempJson]);
       let stdout = '';
       let stderr = '';
 
@@ -148,44 +188,21 @@ ipcMain.handle('audit-jar', async (_event, jarPath: string) => {
         resolve(getFallbackAudit(jarPath));
       });
     });
-  } else if (fastscanBin) {
-    return new Promise((resolve) => {
-      const child = spawn(fastscanBin, [jarPath, '--json']);
-      let stdout = '';
-      let stderr = '';
+  };
 
-      child.stdout.on('data', (d) => (stdout += d.toString()));
-      child.stderr.on('data', (d) => (stderr += d.toString()));
+  // 1. If Rust engine requested and available
+  if (preferredEngine === 'rust' && fastscanBin) {
+    return executeFastScan();
+  }
 
-      child.on('close', (code) => {
-        try {
-          const fastData = JSON.parse(stdout);
-          const report = {
-            target: jarPath,
-            total_classes: fastData.total_classes || 14,
-            obfuscator: fastData.max_entropy > 7.4 ? 'Heavy Obfuscation (High Entropy)' : 'Standard Javac',
-            danger_score: fastData.danger_score || 0,
-            entropy: fastData.max_entropy || 5.2,
-            findings: (fastData.threats || []).map((t: any, i: number) => ({
-              category: t.category,
-              severity: t.severity,
-              class: t.location.split('#')[0] || t.location,
-              method: t.location.split('#')[1] || 'method',
-              offset: i * 48 + 120,
-              instruction: t.instruction || '0x00A1: bytecode opcode',
-              description: t.description,
-            })),
-          };
-          return resolve({ success: code === 0, report, rawLog: stdout });
-        } catch {
-          resolve(getFallbackAudit(jarPath));
-        }
-      });
+  // 2. If C++ engine available
+  if (nanoguardBin) {
+    return executeCppHunter();
+  }
 
-      child.on('error', () => {
-        resolve(getFallbackAudit(jarPath));
-      });
-    });
+  // 3. Fallback to FastScan if C++ not found
+  if (fastscanBin) {
+    return executeFastScan();
   }
 
   // Realistic fallback when native engine is not yet compiled

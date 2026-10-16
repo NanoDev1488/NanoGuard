@@ -13,7 +13,7 @@ export interface ProtectOptions {
 }
 
 contextBridge.exposeInMainWorld('nanoGuardAPI', {
-  auditJar: (jarPath: string) => ipcRenderer.invoke('audit-jar', jarPath),
+  auditJar: (jarPath: string, engine?: 'cpp' | 'rust') => ipcRenderer.invoke('audit-jar', jarPath, engine),
   protectJar: (options: ProtectOptions) => ipcRenderer.invoke('protect-jar', options),
   selectJarFile: () => ipcRenderer.invoke('select-jar-file'),
   selectOutputDir: () => ipcRenderer.invoke('select-output-dir'),

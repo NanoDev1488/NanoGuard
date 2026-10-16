@@ -88,8 +88,8 @@ export const App: React.FC = () => {
     try {
       // @ts-ignore
       if (window.nanoGuardAPI?.auditJar) {
-        // @ts-ignore
-        const res = await window.nanoGuardAPI.auditJar(selectedJar);
+        const activeEngine = _mode === 'fast' ? 'rust' : engine;
+        const res = await window.nanoGuardAPI.auditJar(selectedJar, activeEngine);
         if (res && res.report) {
           setAuditReport(res.report);
           setRawLog(res.rawLog || '');
