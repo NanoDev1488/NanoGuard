@@ -1,0 +1,21 @@
+import { contextBridge, ipcRenderer } from 'electron';
+
+export interface AuditOptions {
+  jarPath: string;
+}
+
+export interface ProtectOptions {
+  jarPath: string;
+  stripLvt: boolean;
+  encryptStrings: boolean;
+  antiDecompile: boolean;
+  outputPath?: string;
+}
+
+contextBridge.exposeInMainWorld('nanoGuardAPI', {
+  auditJar: (jarPath: string) => ipcRenderer.invoke('audit-jar', jarPath),
+  protectJar: (options: ProtectOptions) => ipcRenderer.invoke('protect-jar', options),
+  selectJarFile: () => ipcRenderer.invoke('select-jar-file'),
+  getSystemStats: () => ipcRenderer.invoke('get-system-stats'),
+  windowControl: (action: 'minimize' | 'maximize' | 'close') => ipcRenderer.send('window-control', action),
+});

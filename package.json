@@ -1,0 +1,29 @@
+{
+  "name": "nanoguard",
+  "version": "1.0.0",
+  "description": "Native Bytecode Armor & Backdoor Hunter for Minecraft & Java Plugins",
+  "main": "dist/electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "electron:dev": "concurrently \"vite\" \"wait-on tcp:5173 && electron .\"",
+    "electron:build": "tsc -p electron/tsconfig.json && vite build && electron-builder"
+  },
+  "author": "NanoDev <t.me/WineSquad>",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.1.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19"
+  },
+  "dependencies": {
+    "lucide-react": "^0.323.0"
+  }
+}

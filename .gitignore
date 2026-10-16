@@ -1,0 +1,27 @@
+# Build outputs
+dist/
+build/
+target/
+bin/
+out/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Logs & temp files
+*.log
+*.bak
+temp_*
+.DS_Store
+Thumbs.db
+
+# IDE & Editor
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Rust
+Cargo.lock
+**/*.rs.bk

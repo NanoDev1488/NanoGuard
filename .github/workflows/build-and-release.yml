@@ -1,0 +1,93 @@
+name: Build and Release NanoGuard
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  build-cpp-engine:
+    name: Build C++17 Core Engine (Windows x64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -S resources/engine_cpp -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build C++ Engine
+        run: |
+          cmake --build build --config Release --parallel 2
+
+      - name: Upload C++ Engine Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nanoguard-cpp-engine
+          path: build/bin/Release/nanoguard.exe
+
+  build-rust-fastscan:
+    name: Build Rust FastScan Core (Windows x64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Rust Binary
+        run: |
+          cd crates/nanoguard-fastscan
+          cargo build --release --locked
+
+      - name: Upload Rust FastScan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nanoguard-fastscan-binary
+          path: crates/nanoguard-fastscan/target/release/nanoguard-fastscan.exe
+
+  build-electron-app:
+    name: Build Electron Windows Package
+    needs: [build-cpp-engine, build-rust-fastscan]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Download C++ Engine
+        uses: actions/download-artifact@v4
+        with:
+          name: nanoguard-cpp-engine
+          path: resources/engine_cpp/bin
+
+      - name: Download Rust FastScan
+        uses: actions/download-artifact@v4
+        with:
+          name: nanoguard-fastscan-binary
+          path: crates/target/release
+
+      - name: Install NPM Dependencies
+        run: npm ci
+
+      - name: Build Web Renderer
+        run: npm run build
+
+      - name: Compile Electron Main Process
+        run: npx tsc -p electron/tsconfig.json
+
+      - name: Package Electron App (Portable EXE)
+        run: npx electron-builder --win portable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Packaged Release
+        uses: actions/upload-artifact@v4
+        with:
+          name: nanoguard-windows-portable
+          path: dist/*.exe
