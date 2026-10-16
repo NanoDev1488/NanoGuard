@@ -1,6 +1,6 @@
 {
   "name": "nanoguard",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Native Bytecode Armor & Backdoor Hunter for Minecraft & Java Plugins",
   "main": "dist/electron/main.js",
   "scripts": {
@@ -9,7 +9,10 @@
     "build:electron": "tsc -p electron/tsconfig.json",
     "build": "vite build && tsc -p electron/tsconfig.json",
     "preview": "vite preview",
-    "dist": "npm run build && electron-builder --win portable"
+    "test:e2e": "node scripts/verify_gui.js",
+    "dist:win": "npm run build && electron-builder --win portable",
+    "dist:linux": "npm run build && electron-builder --linux AppImage",
+    "dist:mac": "npm run build && electron-builder --mac dmg zip"
   },
   "author": "NanoDev <t.me/WineSquad>",
   "license": "MIT",
@@ -25,12 +28,27 @@
       "crates/target/release/**/*"
     ],
     "win": {
-      "target": "portable"
+      "target": "portable",
+      "artifactName": "${productName}-${version}-Windows-Portable.${ext}"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Development",
+      "artifactName": "${productName}-${version}-Linux.${ext}"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.developer-tools",
+      "artifactName": "${productName}-${version}-macOS.${ext}"
     }
   },
   "devDependencies": {
     "electron": "^28.2.0",
     "electron-builder": "^24.9.1",
+    "playwright": "^1.41.2",
     "typescript": "^5.3.3",
     "vite": "^5.1.0",
     "@vitejs/plugin-react": "^4.2.1",

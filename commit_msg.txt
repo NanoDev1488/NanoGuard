@@ -1,0 +1,6 @@
+release: NanoGuard v0.1.0 - Multiplatform GUI & CLI
+
+- Synchronize version 0.1.0 across all packages (package.json, Cargo.toml, CMakeLists.txt, main.cpp, App.tsx, README.md)
+- Multiplatform matrix CI/CD (Windows, Linux, macOS) for GUI and CLI
+- macOS Playwright E2E GUI automated test and screenshot generation
+- Automated GitHub Release publication with inline screenshot previews

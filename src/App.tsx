@@ -134,7 +134,7 @@ export const App: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ color: '#00e5ff', fontSize: '15px' }}>🛡️</span>
           <span style={{ fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em' }}>
-            NANOGUARD <span style={{ color: '#88a0b0', fontWeight: 400 }}>v1.0.0</span>
+            NANOGUARD <span style={{ color: '#88a0b0', fontWeight: 400 }}>v0.1.0</span>
           </span>
           <span style={{ fontSize: '10px', color: '#00e5ff', marginLeft: '6px', opacity: 0.8 }}>
             [ NATIVE ARMOR & HUNTER ]

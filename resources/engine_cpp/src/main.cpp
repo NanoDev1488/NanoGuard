@@ -18,7 +18,7 @@ void print_banner() {
  |  \| |/ _` | '_ \ / _ \  | |  _| | | |/ _` | '__/ _` |
  | |\  | (_| | | | | (_) | | |_| | |_| | (_| | | | (_| |
  |_| \_|\__,_|_| |_|\___/   \____|\__,_|\__,_|_|  \__,_|
-   ɴᴀᴛɪᴠᴇ ʙʏᴛᴇᴄᴏᴅᴇ ᴀʀᴍᴏʀ & ʙᴀᴄᴋᴅᴏᴏʀ ʜᴜɴᴛᴇʀ (v1.0.0)
+   ɴᴀᴛɪᴠᴇ ʙʏᴛᴇᴄᴏᴅᴇ ᴀʀᴍᴏʀ & ʙᴀᴄᴋᴅᴏᴏʀ ʜᴜɴᴛᴇʀ (v0.1.0)
 )" << "\n";
 }
 
@@ -76,7 +76,7 @@ int main(int argc, char* argv[]) {
             print_help();
             return 0;
         } else if (arg == "--version" || arg == "-v") {
-            std::cout << "NanoGuard v1.0.0-alpha (Native C++17 Core Engine)\n";
+            std::cout << "NanoGuard v0.1.0 (Native C++17 Core Engine)\n";
             std::cout << "Author: NanoDev (t.me/WineSquad)\n";
             return 0;
         } else if (arg == "--audit" && i + 1 < argc) {

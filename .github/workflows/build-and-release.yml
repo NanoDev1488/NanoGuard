@@ -6,10 +6,26 @@ on:
     tags: [ 'v*' ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-cpp-engine:
-    name: Build C++17 Core Engine (Windows x64)
-    runs-on: windows-latest
+    name: Build C++17 Core Engine (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: nanoguard-cli-windows-x64.exe
+            src_path: build/bin/Release/nanoguard.exe
+          - os: ubuntu-latest
+            artifact_name: nanoguard-cli-linux-x64
+            src_path: build/bin/nanoguard
+          - os: macos-latest
+            artifact_name: nanoguard-cli-macos-x64
+            src_path: build/bin/nanoguard
     steps:
       - uses: actions/checkout@v4
 
@@ -21,15 +37,34 @@ jobs:
         run: |
           cmake --build build --config Release --parallel 2
 
+      - name: Rename executable
+        shell: bash
+        run: |
+          mkdir -p bin-out
+          cp "${{ matrix.src_path }}" "bin-out/${{ matrix.artifact_name }}"
+
       - name: Upload C++ Engine Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nanoguard-cpp-engine
-          path: build/bin/Release/nanoguard.exe
+          name: cpp-engine-${{ matrix.os }}
+          path: bin-out/${{ matrix.artifact_name }}
 
   build-rust-fastscan:
-    name: Build Rust FastScan Core (Windows x64)
-    runs-on: windows-latest
+    name: Build Rust FastScan Core (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: nanoguard-fastscan-windows-x64.exe
+            src_path: crates/nanoguard-fastscan/target/release/nanoguard-fastscan.exe
+          - os: ubuntu-latest
+            artifact_name: nanoguard-fastscan-linux-x64
+            src_path: crates/nanoguard-fastscan/target/release/nanoguard-fastscan
+          - os: macos-latest
+            artifact_name: nanoguard-fastscan-macos-x64
+            src_path: crates/nanoguard-fastscan/target/release/nanoguard-fastscan
     steps:
       - uses: actions/checkout@v4
 
@@ -41,14 +76,75 @@ jobs:
           cd crates/nanoguard-fastscan
           cargo build --release
 
+      - name: Rename executable
+        shell: bash
+        run: |
+          mkdir -p bin-out
+          cp "${{ matrix.src_path }}" "bin-out/${{ matrix.artifact_name }}"
+
       - name: Upload Rust FastScan Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nanoguard-fastscan-binary
-          path: crates/nanoguard-fastscan/target/release/nanoguard-fastscan.exe
+          name: rust-fastscan-${{ matrix.os }}
+          path: bin-out/${{ matrix.artifact_name }}
 
-  build-electron-app:
-    name: Build Electron Windows Package
+  build-and-verify-macos:
+    name: Build, Playwright E2E & Package GUI (macOS)
+    needs: [build-cpp-engine, build-rust-fastscan]
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download C++ Engine (macOS)
+        uses: actions/download-artifact@v4
+        with:
+          name: cpp-engine-macos-latest
+          path: resources/engine_cpp/bin
+
+      - name: Download Rust FastScan (macOS)
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-fastscan-macos-latest
+          path: crates/target/release
+
+      - name: Install Dependencies
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: Build Web Renderer & Electron Main
+        run: |
+          npm run build:renderer
+          npm run build:electron
+
+      - name: Run Playwright E2E Verification & Capture Screenshots
+        run: |
+          node scripts/verify_gui.js
+
+      - name: Upload Verified Screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-screenshots
+          path: docs/screenshots/*.png
+
+      - name: Package macOS App (DMG & ZIP)
+        run: npm run dist:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload macOS GUI Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-macos-package
+          path: dist-release/*.*
+
+  build-gui-windows:
+    name: Package GUI (Windows)
     needs: [build-cpp-engine, build-rust-fastscan]
     runs-on: windows-latest
     steps:
@@ -59,34 +155,151 @@ jobs:
         with:
           node-version: 20
 
-      - name: Download C++ Engine
+      - name: Download C++ Engine (Windows)
         uses: actions/download-artifact@v4
         with:
-          name: nanoguard-cpp-engine
+          name: cpp-engine-windows-latest
           path: resources/engine_cpp/bin
 
-      - name: Download Rust FastScan
+      - name: Download Rust FastScan (Windows)
         uses: actions/download-artifact@v4
         with:
-          name: nanoguard-fastscan-binary
+          name: rust-fastscan-windows-latest
           path: crates/target/release
 
       - name: Install NPM Dependencies
         run: npm install
 
-      - name: Build Web Renderer
-        run: npm run build:renderer
+      - name: Build Web Renderer & Electron Main
+        run: |
+          npm run build:renderer
+          npm run build:electron
 
-      - name: Compile Electron Main Process
-        run: npm run build:electron
-
-      - name: Package Electron App (Portable EXE)
-        run: npx electron-builder --win portable
+      - name: Package Windows App (Portable EXE)
+        run: npm run dist:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Packaged Release
+      - name: Upload Windows GUI Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nanoguard-windows-portable
+          name: gui-windows-package
           path: dist-release/*.exe
+
+  build-gui-linux:
+    name: Package GUI (Linux)
+    needs: [build-cpp-engine, build-rust-fastscan]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download C++ Engine (Linux)
+        uses: actions/download-artifact@v4
+        with:
+          name: cpp-engine-ubuntu-latest
+          path: resources/engine_cpp/bin
+
+      - name: Download Rust FastScan (Linux)
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-fastscan-ubuntu-latest
+          path: crates/target/release
+
+      - name: Install NPM Dependencies
+        run: npm install
+
+      - name: Build Web Renderer & Electron Main
+        run: |
+          npm run build:renderer
+          npm run build:electron
+
+      - name: Package Linux App (AppImage)
+        run: npm run dist:linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Linux GUI Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-linux-package
+          path: dist-release/*.*
+
+  publish-release:
+    name: Publish Official GitHub Release (v0.1.0)
+    needs: [build-cpp-engine, build-rust-fastscan, build-and-verify-macos, build-gui-windows, build-gui-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Organize Release Files
+        run: |
+          mkdir -p release-ready
+          cp release-assets/* release-ready/ || true
+          ls -la release-ready/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0
+          name: "NanoGuard v0.1.0 - Native Bytecode Armor & Backdoor Hunter"
+          draft: false
+          prerelease: false
+          files: release-ready/*
+          body: |
+            # ɴᴀɴᴏɢᴜᴀʀᴅ v0.1.0
+            ### Native Bytecode Armor & Backdoor Hunter
+
+            Официальный первый релиз **NanoGuard** — брата-близнеца [NanoDecompiler](https://github.com/NanoDev1488/NanoDecompiler).
+            Нативный движок для тотального аудита чужих JAR-плагинов и непробиваемой защиты собственных.
+
+            ---
+
+            ### 📸 Интерфейс (Playwright E2E Verified on macOS):
+            <p align="center">
+              <img src="https://raw.githubusercontent.com/NanoDev1488/NanoGuard/main/docs/screenshots/nanoguard_audit.png" alt="NanoGuard Audit & Scan" width="48%" />
+              <img src="https://raw.githubusercontent.com/NanoDev1488/NanoGuard/main/docs/screenshots/nanoguard_protect.png" alt="NanoGuard Protect JAR" width="48%" />
+            </p>
+            <p align="center">
+              <img src="https://raw.githubusercontent.com/NanoDev1488/NanoGuard/main/docs/screenshots/nanoguard_callgraph.png" alt="Interactive Call Graph" width="85%" />
+            </p>
+
+            ---
+
+            ### 🛡️ Модуль Backdoor Hunter
+            - **RCE & Загрузчики**: Детекция `ProcessBuilder`, `Runtime.getRuntime().exec()`, `URLClassLoader` дропперов.
+            - **Перехват прав**: Поиск скрытой выдачи `setOp(true)` и PermissionAttachment `*`.
+            - **Эвристика чата**: Выявление скрытых паролей и триггеров в `AsyncPlayerChatEvent` / `PlayerCommandPreprocessEvent`.
+            - **Fingerprint обфускаторов**: Allatori, Zelix KlassMaster, Stringer, ProGuard.
+            - **Точные офсеты**: Класс, метод, инструкция (`0x04A2: invokevirtual Player.setOp(Z)`).
+
+            ### 🔒 Модуль Bytecode Armor
+            - **Polymorphic String Encryption**: Динамическое XOR+ шифрование констант уникальным ключом билда.
+            - **Anti-Decompiler Traps**: Синтетические мостовые методы (`ACC_SYNTHETIC | ACC_BRIDGE`) и GOTO-ловушки.
+            - **Metadata Stripping**: Полное удаление `LineNumberTable`, `LocalVariableTable`, `SourceFile` (до -40% веса JAR).
+
+            ---
+
+            ### 📦 Загрузка релизов:
+            - **Windows GUI (Portable EXE)**: `NanoGuard-0.1.0-Windows-Portable.exe`
+            - **Linux GUI (AppImage)**: `NanoGuard-0.1.0-Linux.AppImage`
+            - **macOS GUI (DMG / ZIP)**: `NanoGuard-0.1.0-macOS.dmg`
+            - **Нативные CLI утилиты (C++17 & Rust FastScan)**:
+              - Windows: `nanoguard-cli-windows-x64.exe`, `nanoguard-fastscan-windows-x64.exe`
+              - Linux: `nanoguard-cli-linux-x64`, `nanoguard-fastscan-linux-x64`
+              - macOS: `nanoguard-cli-macos-x64`, `nanoguard-fastscan-macos-x64`
+
+            ---
+            *Разработано [NanoDev](https://t.me/radoqi) · Канал: [t.me/WineSquad](https://t.me/WineSquad)*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

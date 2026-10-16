@@ -1,4 +1,4 @@
-# ɴᴀɴᴏɢᴜᴀʀᴅ (NanoGuard)
+# ɴᴀɴᴏɢᴜᴀʀᴅ (NanoGuard) v0.1.0
 ### Native Bytecode Armor & Backdoor Hunter
 
 > **Брат-близнец [NanoDecompiler](https://github.com/NanoDev1488/NanoDecompiler)**: нативный движок на C++17 и Rust для тотального аудита чужих Minecraft-плагинов и непробиваемой защиты собственных.
@@ -21,6 +21,18 @@
                 ▼                                         ▼
   [ Честный отчёт с офсетами ]              [ Защищённый JAR без оверхеда ]
 ```
+
+---
+
+## 📸 Скриншоты интерфейса (Playwright E2E Verified on macOS)
+
+<p align="center">
+  <img src="docs/screenshots/nanoguard_audit.png" width="48%" alt="Audit Tab" />
+  <img src="docs/screenshots/nanoguard_protect.png" width="48%" alt="Protect Tab" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/nanoguard_callgraph.png" width="85%" alt="Call Graph Modal" />
+</p>
 
 ---
 
@@ -47,11 +59,12 @@
 
 ---
 
-## ⚡ Архитектура
+## ⚡ Архитектура и мультиплатформенность
 
-- **Core Engine (C++17):** Потоковая обработка классов из JAR-архива. Загружается один класс -> анализируется/защищается -> пишется в выходной поток -> освобождается. Память стабильно `< 64 МБ RAM`.
-- **FastScan Core (Rust):** Параллельный аудит с использованием `memmap2`, `rayon` и расчётом энтропии Шеннона.
-- **Cyberpunk Dark GUI (Electron + Vite):** Тёмная тема (`#0f2027` фон, бордеры `#2c5364`), Drag & Drop (`ᴘᴇʀᴇᴛᴀꜱʜɪᴛᴇ .ᴊᴀʀ ꜱʏᴜᴅᴀ`), неоновые индикаторы и статус-бар с нулевой телеметрией (`0% TELEMETRY`).
+- **Core Engine (C++17):** Потоковая обработка классов из JAR-архива (< 64 МБ RAM) для Windows, Linux и macOS.
+- **FastScan Core (Rust):** Параллельный аудит с использованием `memmap2`, `rayon`, `zip 9.0.3` и расчётом энтропии Шеннона.
+- **Cyberpunk Dark GUI (Electron + Vite):** Тёмная тема (`#0f2027` фон, бордеры `#2c5364`), Drag & Drop (`ᴘᴇʀᴇᴛᴀꜱʜɪᴛᴇ .ᴊᴀʀ ꜱʏᴜᴅᴀ`), статус-бар (`0% TELEMETRY`).
+- **Автоматические релизы:** Сборка под Windows (Portable EXE), Linux (AppImage) и macOS (DMG / ZIP) + нативные CLI бинарники.
 
 ---
 
@@ -59,10 +72,13 @@
 
 ```bash
 # Аудит подозрительного плагина с выводом в JSON:
-nanoguard.exe --audit suspect_plugin.jar --out report.json
+nanoguard --audit suspect_plugin.jar --out report.json
+
+# Быстрый аудит через Rust FastScan:
+nanoguard-fastscan suspect_plugin.jar --json
 
 # Защита собственного плагина (вырезание LVT, шифрование строк, антидекомпиляция):
-nanoguard.exe --protect my_plugin.jar --strip-lvt --encrypt-strings --anti-decompile --out release/my_plugin_armored.jar
+nanoguard --protect my_plugin.jar --strip-lvt --encrypt-strings --anti-decompile --out release/my_plugin_armored.jar
 ```
 
 ---

@@ -1,6 +1,6 @@
 [package]
 name = "nanoguard-fastscan"
-version = "1.0.0"
+version = "0.1.0"
 edition = "2021"
 authors = ["NanoDev <t.me/WineSquad>"]
 description = "Ultra-fast parallel bytecode security auditor and backdoor hunter for Minecraft/Java plugins"
