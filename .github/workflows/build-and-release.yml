@@ -39,7 +39,7 @@ jobs:
       - name: Build Rust Binary
         run: |
           cd crates/nanoguard-fastscan
-          cargo build --release --locked
+          cargo build --release
 
       - name: Upload Rust FastScan Artifact
         uses: actions/upload-artifact@v4
@@ -58,7 +58,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Download C++ Engine
         uses: actions/download-artifact@v4
@@ -73,13 +72,13 @@ jobs:
           path: crates/target/release
 
       - name: Install NPM Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build Web Renderer
-        run: npm run build
+        run: npm run build:renderer
 
       - name: Compile Electron Main Process
-        run: npx tsc -p electron/tsconfig.json
+        run: npm run build:electron
 
       - name: Package Electron App (Portable EXE)
         run: npx electron-builder --win portable
@@ -90,4 +89,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nanoguard-windows-portable
-          path: dist/*.exe
+          path: dist-release/*.exe

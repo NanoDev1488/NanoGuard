@@ -5,13 +5,29 @@
   "main": "dist/electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build:renderer": "vite build --emptyOutDir",
+    "build:electron": "tsc -p electron/tsconfig.json",
+    "build": "vite build && tsc -p electron/tsconfig.json",
     "preview": "vite preview",
-    "electron:dev": "concurrently \"vite\" \"wait-on tcp:5173 && electron .\"",
-    "electron:build": "tsc -p electron/tsconfig.json && vite build && electron-builder"
+    "dist": "npm run build && electron-builder --win portable"
   },
   "author": "NanoDev <t.me/WineSquad>",
   "license": "MIT",
+  "build": {
+    "appId": "com.nanodev.nanoguard",
+    "productName": "NanoGuard",
+    "directories": {
+      "output": "dist-release"
+    },
+    "files": [
+      "dist/**/*",
+      "resources/engine_cpp/bin/**/*",
+      "crates/target/release/**/*"
+    ],
+    "win": {
+      "target": "portable"
+    }
+  },
   "devDependencies": {
     "electron": "^28.2.0",
     "electron-builder": "^24.9.1",
