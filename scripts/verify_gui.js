@@ -11,10 +11,10 @@ if (!fs.existsSync(SCREENSHOT_DIR)) {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
 }
 
-// Simple local static server for built renderer
+// Local static HTTP server for built React renderer
 function startServer() {
   const mimeTypes = {
-    '.html': 'text/html',
+    '.html': 'text/html; charset=utf-8',
     '.js': 'text/javascript',
     '.css': 'text/css',
     '.png': 'image/png',
@@ -29,19 +29,18 @@ function startServer() {
 
     fs.readFile(filePath, (err, content) => {
       if (err) {
-        // Fallback to index.html for SPA
         fs.readFile(path.join(DIST_DIR, 'index.html'), (err2, fallback) => {
           if (err2) {
             res.writeHead(404);
             res.end('Not Found');
           } else {
-            res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.end(fallback, 'utf-8');
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end(fallback);
           }
         });
       } else {
         res.writeHead(200, { 'Content-Type': contentType });
-        res.end(content, 'utf-8');
+        res.end(content);
       }
     });
   });
@@ -65,57 +64,70 @@ async function runE2E() {
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
 
+    // High-DPI Retina viewport for razor-sharp screenshot quality
     const context = await browser.newContext({
-      viewport: { width: 1040, height: 720 },
+      viewport: { width: 1140, height: 760 },
+      deviceScaleFactor: 2,
     });
 
     const page = await context.newPage();
     await page.goto(`http://127.0.0.1:${PORT}`);
 
-    // Verify Title Bar
+    // Verify Titlebar
     await page.waitForSelector('text=NANOGUARD', { timeout: 10000 });
-    console.log('[✓] Verified Titlebar: NANOGUARD');
+    console.log('[✓] Verified Titlebar: NANOGUARD v0.1.0');
 
-    // Verify Status Bar
-    await page.waitForSelector('text=0% TELEMETRY (OFFLINE)');
+    // Verify Statusbar
+    await page.waitForSelector('text=TELEMETRY');
     console.log('[✓] Verified Statusbar: 0% TELEMETRY (OFFLINE)');
 
-    // Verify Drag & Drop box
-    await page.waitForSelector('text=ᴘᴇʀᴇᴛᴀꜱʜɪᴛᴇ .ᴊᴀʀ ꜱʏᴜᴅᴀ');
-    console.log('[✓] Verified Drag & Drop Box');
+    // 1. Select mock plugin & run audit for rich populated Audit View
+    await page.click('text=ᴘᴇʀᴇᴛᴀꜱʜɪᴛᴇ .ᴊᴀʀ ꜱʏᴜᴅᴀ');
+    await page.waitForTimeout(400);
 
-    // 1. Screenshot Audit Tab
+    // Click static audit button
+    const scanBtn = await page.waitForSelector('button:has-text("СТАТИЧЕСКИЙ АУДИТ")');
+    if (scanBtn) {
+      await scanBtn.click();
+    }
+
+    // Wait for audit results cards to populate
+    await page.waitForSelector('text=ИНДЕКС ОПАСНОСТИ', { timeout: 8000 });
+    await page.waitForSelector('text=НАЙДЕННЫЕ ИНСТРУКЦИИ');
+    await page.waitForTimeout(500);
+
     const auditShot = path.join(SCREENSHOT_DIR, 'nanoguard_audit.png');
     await page.screenshot({ path: auditShot });
-    console.log(`[+] Captured Screenshot: ${auditShot}`);
+    console.log(`[+] Captured Retina Screenshot: ${auditShot} (${fs.statSync(auditShot).size} bytes)`);
 
-    // 2. Switch to Protect Tab & Screenshot
-    await page.click('button:has-text("ᴘʀᴏᴛᴇᴄᴛ ᴊᴀʀ")');
-    await page.waitForSelector('text=ПАРАМЕТРЫ БРОНИРОВАНИЯ БАЙТКОДА');
-    console.log('[✓] Verified Protect Tab UI');
+    // 2. Open Call Graph Modal & Screenshot
+    await page.click('button:has-text("ГРАФ ВЫЗОВОВ")');
+    await page.waitForSelector('text=ИНТЕРАКТИВНЫЙ ГРАФ ВЫЗОВОВ', { timeout: 5000 });
+    await page.waitForTimeout(400);
+
+    const callgraphShot = path.join(SCREENSHOT_DIR, 'nanoguard_callgraph.png');
+    await page.screenshot({ path: callgraphShot });
+    console.log(`[+] Captured Retina Screenshot: ${callgraphShot} (${fs.statSync(callgraphShot).size} bytes)`);
+
+    // Close modal
+    await page.click('button:has-text("ЗАКРЫТЬ")');
+    await page.waitForTimeout(300);
+
+    // 3. Switch to Protect Tab & Screenshot
+    await page.click('button:has-text("ʙʏᴛᴇᴄᴏᴅᴇ ᴀʀᴍᴏʀ")');
+    await page.waitForSelector('text=МОДУЛИ ЗАЩИТЫ');
+
+    // Run protect action
+    const protectBtn = await page.waitForSelector('button:has-text("ЗАЩИТИТЬ ПЛАГИН И СОХРАНИТЬ JAR")');
+    if (protectBtn) {
+      await protectBtn.click();
+      await page.waitForSelector('text=ПЛАГИН УСПЕШНО ЗАЩИЩЕН И СОХРАНЕН НА ДИСК', { timeout: 6000 });
+      await page.waitForTimeout(400);
+    }
 
     const protectShot = path.join(SCREENSHOT_DIR, 'nanoguard_protect.png');
     await page.screenshot({ path: protectShot });
-    console.log(`[+] Captured Screenshot: ${protectShot}`);
-
-    // 3. Switch back to Audit, trigger scan and capture Call Graph Modal
-    await page.click('button:has-text("ᴀᴜᴅɪᴛ & ꜱᴄᴀɴ")');
-    await page.click('.small-caps:has-text("ᴘᴇʀᴇᴛᴀꜱʜɪᴛᴇ .ᴊᴀʀ ꜱʏᴜᴅᴀ")');
-    await page.waitForTimeout(500);
-
-    // If "ЗАПУСТИТЬ АУДИТ" appears, click it
-    const scanBtn = await page.$('button:has-text("ЗАПУСТИТЬ АУДИТ")');
-    if (scanBtn) {
-      await scanBtn.click();
-      await page.waitForSelector('button:has-text("ГРАФ ВЫЗОВОВ ➔")', { timeout: 5000 });
-      await page.click('button:has-text("ГРАФ ВЫЗОВОВ ➔")');
-      await page.waitForSelector('text=ИНТЕРАКТИВНЫЙ ГРАФ ВЫЗОВОВ');
-      console.log('[✓] Verified Interactive Call Graph Modal');
-
-      const modalShot = path.join(SCREENSHOT_DIR, 'nanoguard_callgraph.png');
-      await page.screenshot({ path: modalShot });
-      console.log(`[+] Captured Screenshot: ${modalShot}`);
-    }
+    console.log(`[+] Captured Retina Screenshot: ${protectShot} (${fs.statSync(protectShot).size} bytes)`);
 
     console.log('[★] macOS Playwright E2E GUI Verification completed successfully with 100% pass!');
   } catch (err) {

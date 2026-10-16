@@ -94,6 +94,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -112,6 +115,13 @@ jobs:
           name: rust-fastscan-macos-latest
           path: crates/target/release
 
+      - name: Prepare Engine for Bundling
+        run: |
+          mkdir -p resources/engine
+          cp resources/engine_cpp/bin/nanoguard-cli-macos-x64 resources/engine/nanoguard || true
+          cp crates/target/release/nanoguard-fastscan-macos-x64 resources/engine/nanoguard-fastscan || true
+          chmod +x resources/engine/* || true
+
       - name: Install Dependencies
         run: |
           npm install
@@ -126,22 +136,30 @@ jobs:
         run: |
           node scripts/verify_gui.js
 
-      - name: Upload Verified Screenshots
-        uses: actions/upload-artifact@v4
-        with:
-          name: gui-screenshots
-          path: docs/screenshots/*.png
+      - name: Commit & Push Verified Retina Screenshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots/*.png
+          git commit -m "docs(screenshots): update verified E2E Retina screenshots [skip ci]" || true
+          git push origin main || true
 
       - name: Package macOS App (DMG & ZIP)
         run: npm run dist:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Filter Clean macOS Packages
+        run: |
+          mkdir -p dist-mac-clean
+          cp dist-release/*.dmg dist-mac-clean/ 2>/dev/null || true
+          cp dist-release/*.zip dist-mac-clean/ 2>/dev/null || true
+
       - name: Upload macOS GUI Artifact
         uses: actions/upload-artifact@v4
         with:
           name: gui-macos-package
-          path: dist-release/*.*
+          path: dist-mac-clean/*.*
 
   build-gui-windows:
     name: Package GUI (Windows)
@@ -166,6 +184,13 @@ jobs:
         with:
           name: rust-fastscan-windows-latest
           path: crates/target/release
+
+      - name: Prepare Engine for Bundling
+        shell: bash
+        run: |
+          mkdir -p resources/engine
+          cp resources/engine_cpp/bin/nanoguard-cli-windows-x64.exe resources/engine/nanoguard.exe || true
+          cp crates/target/release/nanoguard-fastscan-windows-x64.exe resources/engine/nanoguard-fastscan.exe || true
 
       - name: Install NPM Dependencies
         run: npm install
@@ -210,6 +235,13 @@ jobs:
           name: rust-fastscan-ubuntu-latest
           path: crates/target/release
 
+      - name: Prepare Engine for Bundling
+        run: |
+          mkdir -p resources/engine
+          cp resources/engine_cpp/bin/nanoguard-cli-linux-x64 resources/engine/nanoguard || true
+          cp crates/target/release/nanoguard-fastscan-linux-x64 resources/engine/nanoguard-fastscan || true
+          chmod +x resources/engine/* || true
+
       - name: Install NPM Dependencies
         run: npm install
 
@@ -227,7 +259,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gui-linux-package
-          path: dist-release/*.*
+          path: dist-release/*.AppImage
 
   publish-release:
     name: Publish Official GitHub Release (v0.1.0)
@@ -242,10 +274,26 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: Organize Release Files
+      - name: Organize Clean Release Files
         run: |
           mkdir -p release-ready
-          cp release-assets/* release-ready/ || true
+          # Copy strictly binaries and installers:
+          cp release-assets/*.exe release-ready/ 2>/dev/null || true
+          cp release-assets/*.dmg release-ready/ 2>/dev/null || true
+          cp release-assets/*.zip release-ready/ 2>/dev/null || true
+          cp release-assets/*.AppImage release-ready/ 2>/dev/null || true
+          cp release-assets/nanoguard-cli-* release-ready/ 2>/dev/null || true
+          cp release-assets/nanoguard-fastscan-* release-ready/ 2>/dev/null || true
+
+          # Purge any debug yml, blockmaps, or loose screenshot images from download assets
+          rm -f release-ready/*.yml release-ready/*.blockmap release-ready/*.png release-ready/builder-debug.yml
+
+          # Generate SHA256 checksums
+          cd release-ready
+          sha256sum * > SHA256SUMS.txt
+          cd ..
+
+          echo "=== RELEASE READY ASSETS ==="
           ls -la release-ready/
 
       - name: Create GitHub Release
@@ -293,7 +341,7 @@ jobs:
             ### 📦 Загрузка релизов:
             - **Windows GUI (Portable EXE)**: `NanoGuard-0.1.0-Windows-Portable.exe`
             - **Linux GUI (AppImage)**: `NanoGuard-0.1.0-Linux.AppImage`
-            - **macOS GUI (DMG / ZIP)**: `NanoGuard-0.1.0-macOS.dmg`
+            - **macOS GUI (DMG / ZIP)**: `NanoGuard-0.1.0-macOS.dmg`, `NanoGuard-0.1.0-macOS.zip`
             - **Нативные CLI утилиты (C++17 & Rust FastScan)**:
               - Windows: `nanoguard-cli-windows-x64.exe`, `nanoguard-fastscan-windows-x64.exe`
               - Linux: `nanoguard-cli-linux-x64`, `nanoguard-fastscan-linux-x64`

@@ -238,11 +238,12 @@ int main(int argc, char* argv[]) {
             output_path = input_jar.substr(0, input_jar.find_last_of('.')) + "_protected.jar";
         }
 
-        // Write output JAR
-        if (JarArchive::write_file(output_path, jar_bytes)) {
+        // Write output JAR with rebuilt entries
+        if (JarArchive::write_entries(output_path, entries)) {
             std::cout << "[+] Protected JAR successfully saved to: " << output_path << "\n";
         } else {
-            std::cerr << "[!] Error writing output JAR.\n";
+            std::cerr << "[!] Error writing output JAR: " << output_path << "\n";
+            return 1;
         }
     }
 

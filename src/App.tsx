@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { AuditTab } from './components/AuditTab';
-import { ProtectTab } from './components/ProtectTab';
+import { Titlebar } from './components/Titlebar';
+import { AppHeader, TabType } from './components/AppHeader';
+import { AuditView, AuditReport, Finding } from './components/AuditView';
+import { ArmorView } from './components/ArmorView';
+import { ConsoleView } from './components/ConsoleView';
+import { CallGraphModal } from './components/CallGraphModal';
+import { SettingsModal } from './components/SettingsModal';
+import { StatusBar } from './components/StatusBar';
+import { Toasts, ToastMessage } from './components/Toasts';
 
 interface SystemStats {
   cpu: string;
@@ -9,25 +16,45 @@ interface SystemStats {
 }
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'audit' | 'protect'>('audit');
+  const [activeTab, setActiveTab] = useState<TabType>('audit');
   const [selectedJar, setSelectedJar] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
-  const [auditReport, setAuditReport] = useState<any>(null);
+  const [auditReport, setAuditReport] = useState<AuditReport | null>(null);
   const [rawLog, setRawLog] = useState<string>('');
+  const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [engine, setEngine] = useState<'cpp' | 'rust'>('cpp');
+  const [threads, setThreads] = useState(4);
+  const [autoOpen, setAutoOpen] = useState(true);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [stats, setStats] = useState<SystemStats>({
     cpu: '1.2%',
-    ram: '38 MB',
+    ram: '42 MB',
     telemetry: '0% TELEMETRY (OFFLINE)',
   });
 
+  const addToast = (type: ToastMessage['type'], title: string, message: string) => {
+    const id = `${Date.now()}_${Math.random()}`;
+    setToasts((prev) => [...prev, { id, type, title, message }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Poll system stats from backend
   useEffect(() => {
-    // Poll stats from backend
     const interval = setInterval(async () => {
       // @ts-ignore
       if (window.nanoGuardAPI?.getSystemStats) {
-        // @ts-ignore
-        const s = await window.nanoGuardAPI.getSystemStats();
-        if (s) setStats(s);
+        try {
+          // @ts-ignore
+          const s = await window.nanoGuardAPI.getSystemStats();
+          if (s) setStats(s);
+        } catch {}
       }
     }, 3000);
     return () => clearInterval(interval);
@@ -41,16 +68,18 @@ export const App: React.FC = () => {
       if (path) {
         setSelectedJar(path);
         setAuditReport(null);
+        addToast('info', 'Файл выбран', `Загружен: ${path.split(/[/\\]/).pop()}`);
       }
     } else {
-      // Browser fallback for testing
+      // Web browser preview fallback
       const fakePath = 'C:\\Plugins\\suspect_plugin.jar';
       setSelectedJar(fakePath);
       setAuditReport(null);
+      addToast('info', 'Файл выбран', 'Загружен: suspect_plugin.jar');
     }
   };
 
-  const handleScan = async () => {
+  const handleScan = async (_mode?: 'fast' | 'deep') => {
     if (!selectedJar) return;
     setScanning(true);
     setAuditReport(null);
@@ -61,225 +90,189 @@ export const App: React.FC = () => {
       if (window.nanoGuardAPI?.auditJar) {
         // @ts-ignore
         const res = await window.nanoGuardAPI.auditJar(selectedJar);
-        setAuditReport(res.report);
-        setRawLog(res.rawLog);
+        if (res && res.report) {
+          setAuditReport(res.report);
+          setRawLog(res.rawLog || '');
+          const count = res.report.findings?.length || 0;
+          if (count > 0) {
+            addToast('error', 'Внимание: Обнаружены бэкдоры', `Найдено ${count} критических аномалий`);
+          } else {
+            addToast('success', 'Аудит завершен', 'Плагин чист. Бэкдоров не обнаружено.');
+          }
+        }
       } else {
-        // Mock fallback
+        // Fallback for browser preview
         setTimeout(() => {
-          setAuditReport({
+          const mockReport: AuditReport = {
             target: selectedJar,
-            total_classes: 18,
+            jar_name: selectedJar.split(/[/\\]/).pop(),
+            total_classes: 24,
+            total_packages: 5,
             obfuscator: 'Zelix KlassMaster / Stringer',
-            danger_score: 90,
+            entropy: 7.68,
+            danger_score: 85,
             findings: [
               {
                 category: 'ForceOP / Backdoor Hijack',
                 severity: 'CRITICAL',
-                class: 'com/plugin/listener/ChatHook',
+                class: 'ru/nanodev/exploit/ChatListener',
                 method: 'onChat(AsyncPlayerChatEvent)V',
                 offset: 1186,
                 instruction: '0x04A2: invokevirtual org/bukkit/entity/Player.setOp(Z)',
-                description: 'Скрытая выдача прав оператора игроку при вводе триггера в чат.',
+                description: 'Скрытая выдача прав оператора (OP) при отправке секретного триггера в чат.',
+              },
+              {
+                category: 'Data Exfiltration (Discord Webhook)',
+                severity: 'HIGH',
+                class: 'ru/nanodev/exploit/WebHookSender',
+                method: 'sendData()V',
+                offset: 48,
+                instruction: '0x0030: ldc "https://discord.com/api/webhooks/112233..."',
+                description: 'Утечка логов сервера, конфигурации и паролей на внешний вебхук.',
+              },
+              {
+                category: 'RCE / Shell Execution',
+                severity: 'HIGH',
+                class: 'ru/nanodev/exploit/PayloadExecutor',
+                method: 'exec()V',
+                offset: 212,
+                instruction: '0x00D4: invokevirtual java/lang/Runtime.exec(Ljava/lang/String;)Ljava/lang/Process;',
+                description: 'Прямой запуск команд командной строки хост-системы Windows/Linux.',
               },
               {
                 category: 'Remote Payload Download (Dropper)',
                 severity: 'CRITICAL',
-                class: 'com/plugin/core/UpdateCheck',
+                class: 'ru/nanodev/exploit/ClassLoaderUtil',
                 method: 'loadRemote()V',
                 offset: 512,
                 instruction: '0x0200: new java/net/URLClassLoader',
-                description: 'Динамическая загрузка вредоносного байткода из сети.',
+                description: 'Динамическая загрузка вредоносного jar из сети в обход проверки антивируса.',
               },
             ],
-          });
-          setRawLog('[+] Scanned 18 classes.\n[+] Found 2 critical vulnerabilities.\n');
+          };
+          setAuditReport(mockReport);
+          setRawLog(
+            `[+] Target: ${selectedJar}\n[+] Scanned 24 classes.\n[!] Detected 4 severe backdoor patterns.\n[!] Threat Score: 85/100 (CRITICAL)\n`
+          );
           setScanning(false);
-        }, 1200);
+          addToast('error', 'Внимание: Обнаружены бэкдоры', 'Найдено 4 критических аномалии');
+        }, 800);
         return;
       }
     } catch (e) {
       console.error(e);
+      addToast('error', 'Ошибка сканирования', 'Не удалось завершить аудит плагина');
     } finally {
       setScanning(false);
     }
   };
 
+  const handleClear = () => {
+    setSelectedJar(null);
+    setAuditReport(null);
+    setRawLog('');
+  };
+
+  const handleProtectComplete = (outPath: string) => {
+    addToast('success', 'Плагин защищен', `Файл сохранен: ${outPath.split(/[/\\]/).pop()}`);
+    if (autoOpen) {
+      // @ts-ignore
+      if (window.nanoGuardAPI?.openPath) {
+        // @ts-ignore
+        window.nanoGuardAPI.openPath(outPath);
+      }
+    }
+  };
+
   const handleWindowControl = (action: 'minimize' | 'maximize' | 'close') => {
     // @ts-ignore
-    window.nanoGuardAPI?.windowControl(action);
+    if (window.nanoGuardAPI?.windowControl) {
+      // @ts-ignore
+      window.nanoGuardAPI.windowControl(action);
+    }
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100vh',
-      backgroundColor: '#0f2027',
-      color: '#e0f2f1',
-      border: '1px solid #2c5364',
-    }}>
-      {/* Custom Title Bar */}
-      <div
-        className="window-drag-region"
-        style={{
-          height: '38px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '0 12px',
-          backgroundColor: '#0b181d',
-          borderBottom: '1px solid #2c5364',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ color: '#00e5ff', fontSize: '15px' }}>🛡️</span>
-          <span style={{ fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em' }}>
-            NANOGUARD <span style={{ color: '#88a0b0', fontWeight: 400 }}>v0.1.0</span>
-          </span>
-          <span style={{ fontSize: '10px', color: '#00e5ff', marginLeft: '6px', opacity: 0.8 }}>
-            [ NATIVE ARMOR & HUNTER ]
-          </span>
-        </div>
-
-        {/* Window action buttons */}
-        <div className="window-no-drag" style={{ display: 'flex', gap: '4px' }}>
-          <button
-            onClick={() => handleWindowControl('minimize')}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#88a0b0',
-              padding: '4px 8px',
-              cursor: 'pointer',
-              fontSize: '12px',
-            }}
-          >
-            —
-          </button>
-          <button
-            onClick={() => handleWindowControl('maximize')}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#88a0b0',
-              padding: '4px 8px',
-              cursor: 'pointer',
-              fontSize: '12px',
-            }}
-          >
-            ▢
-          </button>
-          <button
-            onClick={() => handleWindowControl('close')}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#88a0b0',
-              padding: '4px 8px',
-              cursor: 'pointer',
-              fontSize: '14px',
-            }}
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-
-      {/* Tabs Bar */}
-      <div style={{
+    <div
+      style={{
         display: 'flex',
-        padding: '8px 16px',
-        gap: '12px',
-        backgroundColor: '#11222b',
-        borderBottom: '1px solid #2c5364',
-      }}>
-        <button
-          onClick={() => setActiveTab('audit')}
-          className="small-caps"
-          style={{
-            padding: '8px 18px',
-            backgroundColor: activeTab === 'audit' ? '#142833' : 'transparent',
-            border: activeTab === 'audit' ? '1px solid #00e5ff' : '1px solid transparent',
-            color: activeTab === 'audit' ? '#00e5ff' : '#88a0b0',
-            borderRadius: '4px',
-            fontWeight: 700,
-            fontSize: '12px',
-            cursor: 'pointer',
-            boxShadow: activeTab === 'audit' ? '0 0 10px rgba(0, 229, 255, 0.2)' : 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <span>🛡️</span> [ ᴀᴜᴅɪᴛ & ꜱᴄᴀɴ ]
-        </button>
+        flexDirection: 'column',
+        height: '100vh',
+        backgroundColor: '#070f14',
+        color: '#e0f2f1',
+        overflow: 'hidden',
+      }}
+    >
+      {/* 1. Custom Frameless Title Bar */}
+      <Titlebar
+        onMinimize={() => handleWindowControl('minimize')}
+        onMaximize={() => handleWindowControl('maximize')}
+        onClose={() => handleWindowControl('close')}
+      />
 
-        <button
-          onClick={() => setActiveTab('protect')}
-          className="small-caps"
-          style={{
-            padding: '8px 18px',
-            backgroundColor: activeTab === 'protect' ? '#142833' : 'transparent',
-            border: activeTab === 'protect' ? '1px solid #00e676' : '1px solid transparent',
-            color: activeTab === 'protect' ? '#00e676' : '#88a0b0',
-            borderRadius: '4px',
-            fontWeight: 700,
-            fontSize: '12px',
-            cursor: 'pointer',
-            boxShadow: activeTab === 'protect' ? '0 0 10px rgba(0, 230, 118, 0.2)' : 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <span>🔒</span> [ ᴘʀᴏᴛᴇᴄᴛ ᴊᴀʀ ]
-        </button>
-      </div>
+      {/* 2. Cyber App Header & Navigation */}
+      <AppHeader
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onOpenSettings={() => setSettingsOpen(true)}
+        selectedJar={selectedJar}
+        threatCount={auditReport?.findings?.length || 0}
+      />
 
-      {/* Main Content Area */}
-      <div style={{ flex: 1, padding: '16px', overflowY: 'auto' }}>
-        {activeTab === 'audit' ? (
-          <AuditTab
+      {/* 3. Main Workspace Area */}
+      <div style={{ flex: 1, padding: '14px', overflowY: 'auto' }}>
+        {activeTab === 'audit' && (
+          <AuditView
             onSelectFile={handleSelectFile}
             selectedJar={selectedJar}
             scanning={scanning}
             onScan={handleScan}
+            onClear={handleClear}
             report={auditReport}
             rawLog={rawLog}
+            onOpenCallGraph={(f) => setSelectedFinding(f)}
           />
-        ) : (
-          <ProtectTab onSelectFile={handleSelectFile} selectedJar={selectedJar} />
+        )}
+
+        {activeTab === 'protect' && (
+          <ArmorView
+            onSelectFile={handleSelectFile}
+            selectedJar={selectedJar}
+            onProtectComplete={handleProtectComplete}
+          />
+        )}
+
+        {activeTab === 'console' && (
+          <ConsoleView rawLog={rawLog} onClear={() => setRawLog('')} />
         )}
       </div>
 
-      {/* Bottom Status Bar */}
-      <div style={{
-        height: '28px',
-        backgroundColor: '#0b181d',
-        borderTop: '1px solid #2c5364',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '0 14px',
-        fontSize: '11px',
-        fontFamily: 'JetBrains Mono',
-      }}>
-        <div style={{ display: 'flex', gap: '16px', color: '#88a0b0' }}>
-          <span>
-            CPU: <span style={{ color: '#00e676' }}>{stats.cpu}</span>
-          </span>
-          <span>
-            RAM: <span style={{ color: '#00e5ff' }}>{stats.ram}</span>
-          </span>
-          <span style={{ color: '#80cbc4' }}>
-            {stats.telemetry}
-          </span>
-        </div>
+      {/* 4. Bottom Cyber Status Bar */}
+      <StatusBar
+        cpu={stats.cpu}
+        ram={stats.ram}
+        telemetry={stats.telemetry}
+        engine={engine}
+      />
 
-        <div style={{ color: '#546e7a' }}>
-          NanoDev · <a href="https://t.me/WineSquad" target="_blank" rel="noreferrer" style={{ color: '#80cbc4', textDecoration: 'none' }}>t.me/WineSquad</a>
-        </div>
-      </div>
+      {/* 5. Modals & Notifications */}
+      <CallGraphModal
+        finding={selectedFinding}
+        onClose={() => setSelectedFinding(null)}
+      />
+
+      <SettingsModal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        engine={engine}
+        setEngine={setEngine}
+        threads={threads}
+        setThreads={setThreads}
+        autoOpen={autoOpen}
+        setAutoOpen={setAutoOpen}
+      />
+
+      <Toasts toasts={toasts} onDismiss={removeToast} />
     </div>
   );
 };

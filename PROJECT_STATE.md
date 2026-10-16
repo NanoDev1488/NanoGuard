@@ -1,15 +1,16 @@
 # NanoGuard - Project State
 
-- **Версия**: 0.1.0 (Официальный первый мультиплатформенный релиз)
+- **Версия**: 0.1.0 (Официальный мультиплатформенный релиз)
 - **Архитектура**:
-  - Native C++17 Core Engine (`resources/engine_cpp`): стриминговый парсер классов, CFG, Backdoor Hunter, Bytecode Armor (Windows, Linux, macOS).
+  - Native C++17 Core Engine (`resources/engine_cpp`): потоковый парсер классов, CFG, Backdoor Hunter, Bytecode Armor с полным ребилдом JAR (`JarArchive::write_entries` + CRC-32) (Windows, Linux, macOS).
   - Rust FastScan Core (`crates/nanoguard-fastscan`): параллельный сканер с Rayon, memmap2, zip 9.0.3 и энтропией Шеннона (Windows, Linux, macOS).
-  - GUI (`electron`, `src`): Vite + React + TypeScript, безрамочное окно #0f2027, Small Caps.
-  - CI/CD (`.github/workflows/build-and-release.yml`): мультиплатформенная матрица (Win/Linux/Mac), Playwright E2E верификация со скриншотами на macOS, авто-публикация GitHub Release v0.1.0.
+  - GUI (`electron`, `src`): модульная архитектура в стиле NanoDecompiler (`Titlebar`, `AppHeader`, `AuditView`, `ArmorView`, `ConsoleView`, `CallGraphModal`, `SettingsModal`, `StatusBar`, `Toasts`).
+  - Electron Packaging: `extraResources` для бинарников в `resources/engine` (без `spawn ENOENT`), гарантированное сохранение защищенного JAR на диск с кнопкой открытия в проводнике.
+  - CI/CD (`.github/workflows/build-and-release.yml`): мультиплатформенная матрица (Win/Linux/Mac), Retina E2E верификация Playwright на macOS, чистые ассеты релиза (без `.blockmap` и `.yml`), авто-публикация с инлайн скриншотами.
 - **Окружение**: Windows 10, Intel Pentium P4600, 4 GB RAM.
 - **Правила разработки**:
   - Только `cmd.exe /c`, PowerShell категорически запрещен.
-  - Сборка тяжелых бинарников через GitHub Actions, чтобы не нагружать процессор.
+  - Сборка тяжелых бинарников через GitHub Actions, чтобы не нагружать слабый ПК.
   - Секреты и токены никогда не сохраняются в файлах репозитория.
 
 ## Реализовано (v0.1.0)
@@ -18,12 +19,14 @@
    - Детекция перехвата прав: `Player.setOp(true)`, PermissionAttachment `*`.
    - Эвристика скрытых команд в `AsyncPlayerChatEvent` / `PlayerCommandPreprocessEvent`.
    - Распознавание обфускаторов: Allatori, Zelix, Stringer, ProGuard.
-   - Точные шестнадцатеричные смещения инструкций и контекстные сниппеты.
+   - Интерактивный граф вызовов (`CallGraphModal`) с точными шестнадцатеричными смещениями.
 2. **Модуль Bytecode Armor**:
+   - Гарантированная запись защищенного JAR на диск с пересчетом CRC-32 и локальных/центральных заголовков ZIP.
    - Динамическое шифрование строк полиморфным ключом билда (`XOR+`).
    - Anti-decompiler ловушки (`ACC_SYNTHETIC | ACC_BRIDGE`, GOTO dead jumps).
    - Вырезание отладочного мусора (`LineNumberTable`, `LocalVariableTable`, `SourceFile`).
-3. **Мультиплатформенность & Релизы**:
-   - Сборка GUI: Windows Portable EXE, Linux AppImage, macOS DMG/ZIP.
-   - Сборка нативного C++ и Rust CLI под Windows, Linux и macOS.
-   - Автоматические E2E тесты Playwright на macOS со снятием скриншотов GUI для релиза.
+   - Кнопка «Открыть в проводнике» через `shell.showItemInFolder`.
+3. **GUI & Релиз**:
+   - Модульный UI в стиле NanoDecompiler, терминал логов в реальном времени, модалка настроек.
+   - Четкие Retina 2x скриншоты интерфейса в `docs/screenshots/`.
+   - Чистый GitHub Release v0.1.0 без мусорных файлов (`.blockmap`, `builder-debug.yml`).

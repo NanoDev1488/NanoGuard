@@ -23,9 +23,14 @@
       "output": "dist-release"
     },
     "files": [
-      "dist/**/*",
-      "resources/engine_cpp/bin/**/*",
-      "crates/target/release/**/*"
+      "dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/engine",
+        "to": "engine",
+        "filter": ["**/*"]
+      }
     ],
     "win": {
       "target": "portable",

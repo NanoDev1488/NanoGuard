@@ -1,6 +1,7 @@
-release: NanoGuard v0.1.0 - Multiplatform GUI & CLI
+fix(release): v0.1.0 clean assets, NanoDecompiler GUI architecture & JAR saving
 
-- Synchronize version 0.1.0 across all packages (package.json, Cargo.toml, CMakeLists.txt, main.cpp, App.tsx, README.md)
-- Multiplatform matrix CI/CD (Windows, Linux, macOS) for GUI and CLI
-- macOS Playwright E2E GUI automated test and screenshot generation
-- Automated GitHub Release publication with inline screenshot previews
+- Fix JAR protection saving: rebuild ZIP archive with CRC-32 and write to output file
+- Fix spawn ENOENT: bundle binaries via extraResources in package.json
+- Redesign GUI to match NanoDecompiler architecture (Titlebar, AppHeader, AuditView, ArmorView, ConsoleView, CallGraphModal, SettingsModal, StatusBar, Toasts)
+- Clean up GitHub Release assets: purge *.blockmap, *.yml and debug logs
+- Replace placeholder screenshots with verified high-resolution Retina screenshots in release body
