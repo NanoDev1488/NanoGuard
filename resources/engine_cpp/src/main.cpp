@@ -209,6 +209,25 @@ int main(int argc, char* argv[]) {
 
         ArmorStats total_stats;
         size_t processed_classes = 0;
+        std::string detected_main_class = "";
+        std::string package_prefix = "";
+
+        // Check plugin.yml for main class
+        for (const auto& entry : entries) {
+            if (entry.filename == "plugin.yml" && !entry.data.empty()) {
+                std::string yml(reinterpret_cast<const char*>(entry.data.data()), entry.data.size());
+                size_t pos = yml.find("main:");
+                if (pos != std::string::npos) {
+                    size_t end = yml.find_first_of("\r\n", pos);
+                    std::string line = yml.substr(pos + 5, end - (pos + 5));
+                    line.erase(0, line.find_first_not_of(" \t'\""));
+                    line.erase(line.find_last_not_of(" \t'\"") + 1);
+                    std::replace(line.begin(), line.end(), '.', '/');
+                    detected_main_class = line;
+                }
+                break;
+            }
+        }
 
         for (auto& entry : entries) {
             if (!entry.is_class || entry.data.empty()) continue;
@@ -216,7 +235,17 @@ int main(int argc, char* argv[]) {
             ClassFile cf;
             if (cf.parse(entry.data.data(), entry.data.size())) {
                 processed_classes++;
-                ArmorStats s = BytecodeArmor::protect_class(cf, opts);
+                std::string class_name = cf.get_class_name(cf.this_class);
+                bool is_main = (!detected_main_class.empty() && class_name == detected_main_class);
+
+                if (package_prefix.empty()) {
+                    size_t slash = class_name.find_last_of('/');
+                    if (slash != std::string::npos) {
+                        package_prefix = class_name.substr(0, slash);
+                    }
+                }
+
+                ArmorStats s = BytecodeArmor::protect_class(cf, opts, is_main);
                 total_stats.stripped_attributes += s.stripped_attributes;
                 total_stats.encrypted_strings += s.encrypted_strings;
                 total_stats.obfuscated_methods += s.obfuscated_methods;
@@ -228,10 +257,26 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        // Generate non-uniform synthetic decoy dummy classes
+        if (opts.dummy_class_count > 0 && !package_prefix.empty()) {
+            for (size_t di = 0; di < opts.dummy_class_count; ++di) {
+                ClassFile dummy_cf = BytecodeArmor::generate_dummy_class(package_prefix, di, 42 + static_cast<uint32_t>(di));
+                JarEntry dummy_entry;
+                dummy_entry.filename = dummy_cf.get_class_name(dummy_cf.this_class) + ".class";
+                dummy_entry.data = dummy_cf.serialize();
+                dummy_entry.uncompressed_size = static_cast<uint32_t>(dummy_entry.data.size());
+                dummy_entry.compressed_size = static_cast<uint32_t>(dummy_entry.data.size());
+                dummy_entry.is_class = true;
+                entries.push_back(dummy_entry);
+                total_stats.dummy_classes_created++;
+            }
+        }
+
         std::cout << "[+] Protected " << processed_classes << " classes successfully.\n";
         std::cout << "    - Stripped Debug Attributes: " << total_stats.stripped_attributes << "\n";
         std::cout << "    - Encrypted String Literals: " << total_stats.encrypted_strings << "\n";
         std::cout << "    - Injected Anti-Decompile Traps: " << total_stats.obfuscated_methods << "\n";
+        std::cout << "    - Generated Decoy Dummy Classes: " << total_stats.dummy_classes_created << "\n";
 
         if (output_path.empty()) {
             output_path = input_jar.substr(0, input_jar.find_last_of('.')) + "_protected.jar";

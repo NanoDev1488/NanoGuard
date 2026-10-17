@@ -19,6 +19,8 @@
   "build": {
     "appId": "com.nanodev.nanoguard",
     "productName": "NanoGuard",
+    "compression": "maximum",
+    "afterPack": "scripts/afterPack.cjs",
     "directories": {
       "output": "dist-release"
     },

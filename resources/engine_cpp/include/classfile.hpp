@@ -221,6 +221,20 @@ public:
         return static_cast<uint16_t>(constant_pool.size() - 1);
     }
 
+    uint16_t add_class(const std::string& internal_name) {
+        uint16_t u_idx = add_utf8(internal_name);
+        for (size_t i = 1; i < constant_pool.size(); ++i) {
+            if (constant_pool[i].tag == CONSTANT_Class && constant_pool[i].class_index == u_idx) {
+                return static_cast<uint16_t>(i);
+            }
+        }
+        CpEntry entry;
+        entry.tag = CONSTANT_Class;
+        entry.class_index = u_idx;
+        constant_pool.push_back(entry);
+        return static_cast<uint16_t>(constant_pool.size() - 1);
+    }
+
     bool parse(const uint8_t* data, size_t size) {
         if (size < 10) return false;
         BinaryReader r(data, size);
