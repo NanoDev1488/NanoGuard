@@ -160,12 +160,11 @@ public:
 
             // Generate dense bytecode block with arithmetic & conditionals
             std::vector<uint8_t> byte_seq;
-            // ILOAD_0, ILOAD_1, IADD, ILOAD_2, IMUL, ICONST_1, IADD, IRETURN
             byte_seq.push_back(ILOAD_0);
             byte_seq.push_back(ILOAD_1);
             byte_seq.push_back(IADD);
             byte_seq.push_back(ILOAD_2);
-            byte_seq.push_back(IMUL);
+            byte_seq.push_back(IXOR);
             byte_seq.push_back(ICONST_1);
             byte_seq.push_back(IADD);
             byte_seq.push_back(IRETURN);
@@ -300,15 +299,12 @@ public:
             m_code.max_stack = 6;
             m_code.max_locals = 6;
 
-            // Bytecode sequence: ILOAD_0, ILOAD_1, IADD, ICONST_2, IMUL, IRETURN
-            m_code.code = {
-                ILOAD_0,
-                ILOAD_1,
-                IADD,
-                ICONST_2,
-                IMUL,
-                IRETURN
-            };
+            m_code.code.push_back(ILOAD_0);
+            m_code.code.push_back(ILOAD_1);
+            m_code.code.push_back(IADD);
+            m_code.code.push_back(ICONST_2);
+            m_code.code.push_back(IXOR);
+            m_code.code.push_back(IRETURN);
             mi.attributes.push_back(m_code);
             cf.methods.push_back(mi);
         }
